@@ -265,6 +265,24 @@ app.get('/api/results', async (_req, res) => {
   }
 });
 
+// DELETE /api/admin/results  – body: { ids: [1,2,3] }
+app.delete('/api/admin/results', async (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'ids must be a non-empty array' });
+  }
+  try {
+    const { rowCount } = await pool.query(
+      `DELETE FROM test_submissions WHERE id = ANY($1)`,
+      [ids.map(Number)]
+    );
+    res.json({ success: true, deleted: rowCount });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: 'Failed to delete submissions' });
+  }
+});
+
 // GET /api/results/:id
 app.get('/api/results/:id', async (req, res) => {
   try {
@@ -387,6 +405,39 @@ app.post('/api/admin/question-paper', async (req, res) => {
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ error: 'Failed to set question paper' });
+  }
+});
+
+// POST   /api/admin/question-paper/questions/:id  — add one question to active paper
+app.post('/api/admin/question-paper/questions/:id', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE question_paper
+       SET question_ids = array_append(question_ids, $1)
+       WHERE singleton = 1 AND NOT ($1 = ANY(question_ids))`,
+      [id]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'No active paper or question already added' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: 'Failed to add question to paper' });
+  }
+});
+
+// DELETE /api/admin/question-paper/questions/:id  — remove one question from active paper
+app.delete('/api/admin/question-paper/questions/:id', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  try {
+    await pool.query(
+      `UPDATE question_paper SET question_ids = array_remove(question_ids, $1) WHERE singleton = 1`,
+      [id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: 'Failed to remove question from paper' });
   }
 });
 

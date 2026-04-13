@@ -66,9 +66,13 @@
            border-radius:7px; font-size:.88rem; font-weight:600; cursor:pointer; border:none; transition:background .15s; }
     .btn-blue   { background:var(--blue); color:#fff; }
     .btn-blue:hover { background:var(--blue-dk); }
-    .btn-green  { background:#f0fdf4; color:#16a34a; border:1.5px solid #bbf7d0; }
+    .btn-green       { background:#f0fdf4; color:#16a34a; border:1.5px solid #bbf7d0; }
     .btn-green:hover { background:#dcfce7; }
-    .btn-red    { background:#fef2f2; color:var(--red); border:1.5px solid #fecaca; }
+    .btn-red         { background:#fef2f2; color:var(--red); border:1.5px solid #fecaca; }
+    .btn-paper-add   { background:#f0fdf4; color:#16a34a; border:1.5px solid #86efac; font-size:.78rem; }
+    .btn-paper-add:hover { background:#dcfce7; }
+    .btn-paper-remove { background:#fff7ed; color:#c2410c; border:1.5px solid #fed7aa; font-size:.78rem; }
+    .btn-paper-remove:hover { background:#ffedd5; }
     .btn-red:hover { background:#fee2e2; }
     .btn-ghost  { background:var(--bg); color:var(--text); border:1.5px solid var(--border); }
     .btn-ghost:hover { background:var(--border); }
@@ -83,6 +87,8 @@
     td { padding:10px 14px; border-bottom:1px solid var(--border); font-size:.88rem; }
     tr:last-child td { border-bottom:none; }
     tr:hover td { background:#f8fafc; }
+    tr.row-selected td { background:#eff6ff; }
+    tr.row-selected:hover td { background:#dbeafe; }
     .badge { display:inline-block; border-radius:99px; padding:2px 9px; font-size:.75rem; font-weight:700; }
     .badge-green { background:#dcfce7; color:#16a34a; }
     .badge-amber { background:#fef3c7; color:#d97706; }
@@ -145,6 +151,7 @@
     }
     .q-row:hover { border-color:#93c5fd; background:#f8fafc; }
     .q-row.selected { border-color:var(--blue); background:#eff6ff; }
+    .q-row.in-paper { border-left:3px solid var(--green); }
     .q-row input[type=checkbox] { width:16px; height:16px; cursor:pointer; accent-color:var(--blue); }
     .q-id   { font-size:.75rem; color:var(--muted); font-weight:700; }
     .q-badge-math   { background:#eff6ff; color:var(--blue); border-radius:5px; padding:2px 8px; font-size:.72rem; font-weight:700; }
@@ -278,6 +285,10 @@
       <input type="search" id="results-search" placeholder="Search name or email…"/>
       <button class="btn btn-blue" onclick="loadResults()">↻ Refresh</button>
       <button class="btn btn-green" onclick="exportCSV()">↓ CSV</button>
+      <button class="btn btn-red" id="btn-delete-selected" style="display:none" onclick="deleteSelectedResults()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+        Delete Selected (<span id="del-count">0</span>)
+      </button>
     </div>
 
     <div class="section">
@@ -286,6 +297,7 @@
       <table id="results-table" style="display:none">
         <thead>
           <tr>
+            <th style="width:36px"><input type="checkbox" id="chk-all" title="Select all" onchange="toggleAllResults(this.checked)"/></th>
             <th onclick="sortBy('id')">#</th>
             <th onclick="sortBy('name')">Name</th>
             <th onclick="sortBy('email')">Email</th>
@@ -420,12 +432,13 @@
 
 <script>
 // ══ State ══════════════════════════════════════════════════════════════════════
-let allResults   = [];
-let allQuestions = [];
-let selected     = new Set();   // selected question IDs (numbers)
-let filterType   = 'all';
-let sortKey      = 'submitted_at';
-let sortAsc      = false;
+let allResults      = [];
+let allQuestions    = [];
+let selected        = new Set();   // selected question IDs (numbers)
+let selectedResults = new Set();   // selected submission IDs for deletion
+let filterType      = 'all';
+let sortKey         = 'submitted_at';
+let sortAsc         = false;
 
 // ══ Tab switching ══════════════════════════════════════════════════════════════
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -494,6 +507,8 @@ async function loadResults() {
   document.getElementById('loading').style.display='block';
   document.getElementById('results-table').style.display='none';
   document.getElementById('empty').style.display='none';
+  selectedResults.clear();
+  updateDeleteBar();
   try {
     allResults = await fetch('/api/results').then(r=>r.json());
     document.getElementById('last-refresh').textContent='Refreshed '+new Date().toLocaleTimeString();
@@ -529,8 +544,11 @@ function renderTable(rows) {
     return va<vb ? (sortAsc?-1:1) : va>vb ? (sortAsc?1:-1) : 0;
   });
   document.getElementById('table-body').innerHTML = sorted.map(r=>{
-    const pct=parseFloat(r.percentage);
-    return `<tr>
+    const pct  = parseFloat(r.percentage);
+    const chkd = selectedResults.has(r.id) ? 'checked' : '';
+    const rowCls = selectedResults.has(r.id) ? ' class="row-selected"' : '';
+    return `<tr${rowCls}>
+      <td><input type="checkbox" ${chkd} onchange="toggleResultSelect(${r.id}, this.checked)" onclick="event.stopPropagation()"/></td>
       <td>${r.id}</td>
       <td>${esc(r.name||'Anonymous')}</td>
       <td>${esc(r.email)}</td>
@@ -541,6 +559,11 @@ function renderTable(rows) {
       <td><button class="btn btn-ghost btn-sm" onclick="showDetail(${r.id})">View</button></td>
     </tr>`;
   }).join('');
+
+  // Sync select-all checkbox state
+  const chkAll = document.getElementById('chk-all');
+  if (chkAll) chkAll.checked = sorted.length > 0 && sorted.every(r => selectedResults.has(r.id));
+  updateDeleteBar();
 }
 
 function sortBy(key) {
@@ -549,6 +572,57 @@ function sortBy(key) {
   renderTable(allResults);
 }
 document.getElementById('results-search').addEventListener('input', ()=>renderTable(allResults));
+
+function toggleResultSelect(id, checked) {
+  if (checked) selectedResults.add(id); else selectedResults.delete(id);
+  updateDeleteBar();
+  // Sync select-all checkbox
+  const visibleIds = [...document.querySelectorAll('#table-body tr')].map(tr =>
+    parseInt(tr.querySelector('input[type=checkbox]')?.getAttribute('onchange')?.match(/\d+/)?.[0])
+  ).filter(Boolean);
+  const chkAll = document.getElementById('chk-all');
+  if (chkAll) chkAll.checked = visibleIds.length > 0 && visibleIds.every(id => selectedResults.has(id));
+}
+
+function toggleAllResults(checked) {
+  const checkboxes = document.querySelectorAll('#table-body input[type=checkbox]');
+  checkboxes.forEach(cb => {
+    const id = parseInt(cb.getAttribute('onchange').match(/\d+/)[0]);
+    if (checked) selectedResults.add(id); else selectedResults.delete(id);
+    cb.checked = checked;
+  });
+  document.querySelectorAll('#table-body tr').forEach(tr =>
+    tr.classList.toggle('row-selected', checked)
+  );
+  updateDeleteBar();
+}
+
+function updateDeleteBar() {
+  const btn = document.getElementById('btn-delete-selected');
+  const cnt = document.getElementById('del-count');
+  if (selectedResults.size > 0) {
+    btn.style.display = 'inline-flex';
+    cnt.textContent   = selectedResults.size;
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+async function deleteSelectedResults() {
+  if (!selectedResults.size) return;
+  const n = selectedResults.size;
+  if (!confirm(`Permanently delete ${n} submission${n>1?'s':''}? This cannot be undone.`)) return;
+  try {
+    const res = await fetch('/api/admin/results', {
+      method: 'DELETE', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ ids: [...selectedResults] })
+    }).then(r=>r.json());
+    if (!res.success) throw new Error(res.error);
+    selectedResults.clear();
+    await loadResults();
+    toast(`Deleted ${res.deleted} submission${res.deleted>1?'s':''}.`);
+  } catch(e) { alert('Error: '+e.message); }
+}
 
 async function showDetail(id) {
   document.getElementById('modal-title').textContent = `Submission #${id}`;
@@ -661,7 +735,7 @@ function renderPaperBanner(paper) {
               <input class="pb-time-input" id="pb-edit-time" type="number" min="1" max="180" value="${limMin}"/>
               <span>min</span>
             </label>
-            <button class="btn btn-green btn-sm" onclick="updatePaperMeta()">Save</button>
+            <button class="btn btn-blue btn-sm" onclick="updatePaperMeta()">Save</button>
           </div>
         </div>
         <button class="btn btn-red btn-sm" onclick="clearPaper()">✕ Clear Paper</button>
@@ -689,8 +763,8 @@ function renderQuestionList() {
 }
 
 function _doRender(activeIds) {
-  const filtered = filterType==='all' ? allQuestions
-    : allQuestions.filter(q=>q.type===filterType);
+  const filtered    = filterType==='all' ? allQuestions : allQuestions.filter(q=>q.type===filterType);
+  const paperActive = activeIds.size > 0;
 
   const mathCount   = allQuestions.filter(q=>q.type==='math').length;
   const abacusCount = allQuestions.filter(q=>q.type==='abacus').length;
@@ -716,16 +790,34 @@ function _doRender(activeIds) {
       const svg = abacusSVG(q.thousands, q.hundreds, q.tens, q.units, 83, 102);
       content = `<div class="q-abacus-mini">${svg}</div>`;
     }
-    const inPaperMark = inPaper ? `<span style="color:var(--green);font-size:.75rem;font-weight:700">★ In Paper</span>` : '';
-    return `<div class="q-row${isSelected?' selected':''}" onclick="toggleSelect(${q.id}, event)" data-id="${q.id}">
+    let paperBtn = '';
+    if (paperActive) {
+      paperBtn = inPaper
+        ? `<button class="btn btn-paper-remove btn-sm" onclick="togglePaperQuestion(${q.id},true,event)" title="Remove from paper">− Paper</button>`
+        : `<button class="btn btn-paper-add btn-sm"    onclick="togglePaperQuestion(${q.id},false,event)" title="Add to paper">+ Paper</button>`;
+    }
+    return `<div class="q-row${isSelected?' selected':''}${inPaper?' in-paper':''}" onclick="toggleSelect(${q.id}, event)" data-id="${q.id}">
       <input type="checkbox" ${isSelected?'checked':''} onclick="toggleSelect(${q.id}, event)"/>
       <span class="q-id">#${q.id}</span>
       <span>${typeBadge}</span>
-      <span class="q-content">${content} ${inPaperMark}</span>
+      <span class="q-content">${content}</span>
       <span class="q-answer">= ${q.answer}</span>
+      ${paperBtn}
       <button class="btn btn-red btn-sm" onclick="deleteQuestion(${q.id}, event)">Delete</button>
     </div>`;
   }).join('');
+}
+
+async function togglePaperQuestion(id, inPaper, event) {
+  event.stopPropagation();
+  try {
+    const method = inPaper ? 'DELETE' : 'POST';
+    const res = await fetch(`/api/admin/question-paper/questions/${id}`, { method }).then(r=>r.json());
+    if (!res.success) throw new Error(res.error);
+    await loadPaperStatus();   // refresh banner count
+    renderQuestionList();      // re-render buttons
+    toast(inPaper ? `Question #${id} removed from paper.` : `Question #${id} added to paper.`);
+  } catch(e) { alert('Error: '+e.message); }
 }
 
 function toggleSelect(id, e) {
