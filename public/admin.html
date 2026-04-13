@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin – Abacus Test</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --blue:#3b82f6; --blue-dk:#1d4ed8; --green:#22c55e; --red:#ef4444;
+      --amber:#f59e0b; --bg:#f1f5f9; --surface:#fff; --border:#e2e8f0;
+      --text:#1e293b; --muted:#64748b; --radius:10px;
+      --shadow:0 2px 12px rgba(0,0,0,.08);
+    }
+    body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+    /* ── Header ── */
+    header {
+      background:var(--surface); border-bottom:1px solid var(--border);
+      padding:14px 28px; display:flex; align-items:center; justify-content:space-between;
+      position:sticky; top:0; z-index:50;
+    }
+    header h1 { font-size:1.1rem; font-weight:700; }
+    #last-refresh { font-size:.8rem; color:var(--muted); }
+
+    /* ── Tabs ── */
+    .tabs-nav {
+      display:flex; gap:0; background:var(--surface);
+      border-bottom:2px solid var(--border); padding:0 28px;
+    }
+    .tab-btn {
+      padding:12px 24px; border:none; background:none; cursor:pointer;
+      font-size:.95rem; font-weight:600; color:var(--muted);
+      border-bottom:3px solid transparent; margin-bottom:-2px;
+      transition:color .15s, border-color .15s;
+    }
+    .tab-btn.active { color:var(--blue); border-bottom-color:var(--blue); }
+    .tab-btn:hover:not(.active) { color:var(--text); }
+
+    .tab-pane { display:none; }
+    .tab-pane.active { display:block; }
+
+    /* ── Shared layout ── */
+    .page-inner { padding:24px 28px 48px; }
+    .section { background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow); margin-bottom:20px; }
+    .section-head { padding:16px 20px 0; border-bottom:1px solid var(--border); margin-bottom:0; }
+    .section-head h2 { font-size:1rem; font-weight:700; padding-bottom:14px; }
+    .section-body { padding:20px; }
+
+    /* ── Stats row ── */
+    .stats { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:20px; }
+    .stat-card { background:var(--surface); border-radius:var(--radius); padding:16px 22px; box-shadow:var(--shadow); min-width:140px; }
+    .stat-card .label { font-size:.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px; }
+    .stat-card .value { font-size:1.8rem; font-weight:800; }
+
+    /* ── Toolbar ── */
+    .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:16px; }
+    .toolbar input[type=search] {
+      padding:8px 14px; border:1.5px solid var(--border); border-radius:7px;
+      font-size:.88rem; outline:none; width:220px;
+    }
+    .toolbar input:focus { border-color:var(--blue); }
+
+    /* ── Buttons ── */
+    .btn { display:inline-flex; align-items:center; gap:5px; padding:8px 16px;
+           border-radius:7px; font-size:.88rem; font-weight:600; cursor:pointer; border:none; transition:background .15s; }
+    .btn-blue   { background:var(--blue); color:#fff; }
+    .btn-blue:hover { background:var(--blue-dk); }
+    .btn-green  { background:#f0fdf4; color:#16a34a; border:1.5px solid #bbf7d0; }
+    .btn-green:hover { background:#dcfce7; }
+    .btn-red    { background:#fef2f2; color:var(--red); border:1.5px solid #fecaca; }
+    .btn-red:hover { background:#fee2e2; }
+    .btn-ghost  { background:var(--bg); color:var(--text); border:1.5px solid var(--border); }
+    .btn-ghost:hover { background:var(--border); }
+    .btn-sm     { padding:4px 10px; font-size:.78rem; }
+
+    /* ── Results table ── */
+    table { width:100%; border-collapse:collapse; }
+    th { background:#f8fafc; text-align:left; padding:10px 14px; font-size:.77rem; font-weight:700;
+         text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
+         border-bottom:1px solid var(--border); cursor:pointer; user-select:none; }
+    th:hover { background:#f1f5f9; }
+    td { padding:10px 14px; border-bottom:1px solid var(--border); font-size:.88rem; }
+    tr:last-child td { border-bottom:none; }
+    tr:hover td { background:#f8fafc; }
+    .badge { display:inline-block; border-radius:99px; padding:2px 9px; font-size:.75rem; font-weight:700; }
+    .badge-green { background:#dcfce7; color:#16a34a; }
+    .badge-amber { background:#fef3c7; color:#d97706; }
+    .badge-red   { background:#fee2e2; color:#dc2626; }
+
+    #loading, #empty { text-align:center; padding:40px; color:var(--muted); }
+
+    /* ── Paper status banner ── */
+    .paper-banner {
+      border-radius:var(--radius); padding:16px 20px;
+      display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+      margin-bottom:20px;
+    }
+    .paper-banner.random { background:#eff6ff; border:1.5px solid #bfdbfe; }
+    .paper-banner.active { background:#f0fdf4; border:1.5px solid #bbf7d0; }
+    .paper-banner .pb-icon { font-size:1.4rem; }
+    .paper-banner .pb-text { flex:1; }
+    .paper-banner .pb-title { font-weight:700; font-size:.95rem; }
+    .paper-banner .pb-sub   { font-size:.82rem; color:var(--muted); margin-top:2px; }
+
+    /* ── Question bank filter bar ── */
+    .qbank-bar {
+      display:flex; align-items:center; justify-content:space-between;
+      flex-wrap:wrap; gap:10px; margin-bottom:14px;
+    }
+    .filter-group { display:flex; gap:6px; }
+    .filter-btn {
+      padding:6px 14px; border-radius:6px; font-size:.83rem; font-weight:600;
+      border:1.5px solid var(--border); background:var(--surface); cursor:pointer;
+      color:var(--muted); transition:all .15s;
+    }
+    .filter-btn.active { background:var(--blue); color:#fff; border-color:var(--blue); }
+    .filter-btn:hover:not(.active) { border-color:var(--blue); color:var(--blue); }
+
+    /* ── Question list ── */
+    .q-list { display:flex; flex-direction:column; gap:6px; }
+    .q-row {
+      display:grid; grid-template-columns:36px 48px 90px 1fr 60px 70px;
+      align-items:center; gap:10px; padding:10px 14px;
+      background:var(--surface); border:1.5px solid var(--border); border-radius:8px;
+      cursor:pointer; transition:border-color .15s, background .15s;
+    }
+    .q-row:hover { border-color:#93c5fd; background:#f8fafc; }
+    .q-row.selected { border-color:var(--blue); background:#eff6ff; }
+    .q-row input[type=checkbox] { width:16px; height:16px; cursor:pointer; accent-color:var(--blue); }
+    .q-id   { font-size:.75rem; color:var(--muted); font-weight:700; }
+    .q-badge-math   { background:#eff6ff; color:var(--blue); border-radius:5px; padding:2px 8px; font-size:.72rem; font-weight:700; }
+    .q-badge-abacus { background:#fef3c7; color:#b45309; border-radius:5px; padding:2px 8px; font-size:.72rem; font-weight:700; }
+    .q-content { font-size:.88rem; display:flex; align-items:center; gap:8px; overflow:hidden; }
+    .q-math-text { font-family:'Courier New',monospace; font-weight:700; font-size:.95rem; white-space:nowrap; }
+    .q-abacus-mini svg { width:64px; height:auto; display:block; }
+    .q-answer { font-size:.88rem; color:var(--muted); font-weight:600; white-space:nowrap; }
+    .q-seeded { font-size:.7rem; color:#94a3b8; white-space:nowrap; }
+
+    /* ── Set-as-paper action bar ── */
+    .action-bar {
+      position:sticky; bottom:0; left:0; right:0;
+      background:var(--blue); color:#fff; padding:14px 28px;
+      display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+      box-shadow:0 -4px 20px rgba(59,130,246,.35);
+      border-radius:12px 12px 0 0;
+      transform:translateY(100%); transition:transform .25s ease;
+      z-index:40;
+    }
+    .action-bar.visible { transform:translateY(0); }
+    .action-bar .ab-count { font-weight:700; font-size:1rem; flex-shrink:0; }
+    .action-bar input {
+      flex:1; min-width:180px; max-width:280px; padding:8px 12px;
+      border-radius:7px; border:none; font-size:.9rem; outline:none;
+    }
+    .action-bar .btn-white {
+      background:#fff; color:var(--blue); border:none; border-radius:7px;
+      padding:8px 18px; font-size:.9rem; font-weight:700; cursor:pointer;
+      flex-shrink:0;
+    }
+    .action-bar .btn-white:hover { background:#e0f2fe; }
+    .action-bar .ab-deselect {
+      background:rgba(255,255,255,.2); color:#fff; border:none; border-radius:6px;
+      padding:6px 12px; font-size:.82rem; cursor:pointer; flex-shrink:0;
+    }
+
+    /* ── Add question section ── */
+    .add-section { margin-top:28px; }
+    .add-section h3 { font-size:1rem; font-weight:700; margin-bottom:14px; }
+    .add-type-tabs { display:flex; gap:8px; margin-bottom:18px; }
+    .add-type-btn {
+      padding:8px 20px; border-radius:8px; border:1.5px solid var(--border);
+      background:var(--surface); font-size:.9rem; font-weight:600;
+      color:var(--muted); cursor:pointer; transition:all .15s;
+    }
+    .add-type-btn.active { background:var(--blue); color:#fff; border-color:var(--blue); }
+    .add-form { display:none; }
+    .add-form.visible { display:block; }
+    .form-row { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:14px; }
+    .form-field { display:flex; flex-direction:column; gap:5px; }
+    .form-field label { font-size:.82rem; font-weight:600; color:var(--muted); }
+    .form-field input, .form-field textarea {
+      padding:9px 12px; border:1.5px solid var(--border); border-radius:7px;
+      font-size:.95rem; outline:none; font-family:inherit;
+    }
+    .form-field input:focus, .form-field textarea:focus { border-color:var(--blue); }
+    .form-hint { font-size:.78rem; color:var(--muted); margin-top:4px; }
+    .abacus-preview-wrap {
+      margin:14px 0; display:flex; align-items:center; gap:20px; flex-wrap:wrap;
+    }
+    .preview-abacus-box {
+      background:#fdf6ec; border-radius:10px; padding:10px;
+      box-shadow:0 2px 10px rgba(0,0,0,.1); display:inline-block;
+    }
+    .preview-abacus-box svg { width:160px; height:254px; display:block; }
+    .preview-label { font-size:.9rem; color:var(--muted); }
+
+    /* ── Submission detail modal ── */
+    .modal-overlay {
+      display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,.45); z-index:100; align-items:center; justify-content:center;
+    }
+    .modal-overlay.open { display:flex; }
+    .modal {
+      background:var(--surface); border-radius:14px; padding:26px;
+      width:95%; max-width:800px; max-height:82vh; overflow-y:auto;
+      box-shadow:0 16px 48px rgba(0,0,0,.18);
+    }
+    .modal h2 { font-size:1.05rem; font-weight:700; margin-bottom:14px; }
+    .modal-close { float:right; background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--muted); line-height:1; }
+    .answer-grid {
+      display:grid; grid-template-columns:auto 70px 90px 1fr 1fr 1fr;
+      gap:4px; font-size:.82rem;
+    }
+    .ag-head { font-size:.72rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; padding:4px 8px; }
+    .ag-cell { padding:7px 8px; border-radius:5px; display:flex; align-items:center; }
+    .ag-row-ok   .ag-cell { background:#f0fdf4; }
+    .ag-row-fail .ag-cell { background:#fef2f2; }
+    .ag-mark { font-weight:800; }
+    .ag-mark.ok   { color:var(--green); }
+    .ag-mark.fail { color:var(--red); }
+    .ag-type-math   { background:#eff6ff; color:var(--blue); border-radius:4px; padding:1px 6px; font-size:.72rem; font-weight:700; }
+    .ag-type-abacus { background:#fef3c7; color:#b45309; border-radius:4px; padding:1px 6px; font-size:.72rem; font-weight:700; }
+    .ag-user.wrong { color:var(--red); text-decoration:line-through; }
+    .ag-correct { color:var(--green); font-weight:700; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Abacus Test — Admin</h1>
+  <span id="last-refresh">–</span>
+</header>
+
+<nav class="tabs-nav">
+  <button class="tab-btn active" data-tab="results">Results</button>
+  <button class="tab-btn"        data-tab="questions">Question Bank</button>
+</nav>
+
+<!-- ══════════════ RESULTS TAB ══════════════ -->
+<div id="tab-results" class="tab-pane active">
+  <div class="page-inner">
+
+    <div class="stats">
+      <div class="stat-card"><div class="label">Submissions</div><div class="value" id="stat-total">–</div></div>
+      <div class="stat-card"><div class="label">Avg Score</div><div class="value" id="stat-avg">–</div></div>
+      <div class="stat-card"><div class="label">Perfect</div><div class="value" id="stat-perfect">–</div></div>
+      <div class="stat-card"><div class="label">Avg Time</div><div class="value" id="stat-time">–</div></div>
+    </div>
+
+    <div class="toolbar">
+      <input type="search" id="results-search" placeholder="Search name or email…"/>
+      <button class="btn btn-blue" onclick="loadResults()">↻ Refresh</button>
+      <button class="btn btn-green" onclick="exportCSV()">↓ CSV</button>
+    </div>
+
+    <div class="section">
+      <div id="loading">Loading…</div>
+      <div id="empty" style="display:none">No submissions yet.</div>
+      <table id="results-table" style="display:none">
+        <thead>
+          <tr>
+            <th onclick="sortBy('id')">#</th>
+            <th onclick="sortBy('name')">Name</th>
+            <th onclick="sortBy('email')">Email</th>
+            <th onclick="sortBy('score')">Score</th>
+            <th onclick="sortBy('percentage')">%</th>
+            <th onclick="sortBy('time_taken')">Time</th>
+            <th onclick="sortBy('submitted_at')">Submitted</th>
+            <th>Detail</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ QUESTIONS TAB ══════════════ -->
+<div id="tab-questions" class="tab-pane">
+  <div class="page-inner">
+
+    <!-- Paper status -->
+    <div id="paper-banner"></div>
+
+    <!-- Question bank -->
+    <div class="section">
+      <div class="section-head">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <h2>Question Bank</h2>
+          <div id="q-count-label" style="font-size:.82rem;color:var(--muted)"></div>
+        </div>
+      </div>
+      <div class="section-body">
+
+        <div class="qbank-bar">
+          <div class="filter-group">
+            <button class="filter-btn active" data-ftype="all">All</button>
+            <button class="filter-btn"        data-ftype="math">Math</button>
+            <button class="filter-btn"        data-ftype="abacus">Abacus</button>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" onclick="selectAll()">Select All</button>
+            <button class="btn btn-ghost btn-sm" onclick="deselectAll()">Deselect All</button>
+          </div>
+        </div>
+
+        <div class="q-list" id="question-list">
+          <div style="text-align:center;padding:32px;color:var(--muted)">Loading questions…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add question section -->
+    <div class="section add-section">
+      <div class="section-head"><h2>Add New Question</h2></div>
+      <div class="section-body">
+
+        <div class="add-type-tabs">
+          <button class="add-type-btn active" data-add-type="math">Math Problem</button>
+          <button class="add-type-btn"        data-add-type="abacus">Abacus / Diagram</button>
+        </div>
+
+        <!-- Math form -->
+        <div id="add-math-form" class="add-form visible">
+          <div class="form-row">
+            <div class="form-field" style="flex:2">
+              <label>Problem expression</label>
+              <input type="text" id="math-problem" placeholder="e.g. 43 + 7 - 3 + 5"
+                     oninput="autoCalcAnswer()" />
+              <div class="form-hint">Use + and − only. Answer is auto-calculated.</div>
+            </div>
+            <div class="form-field" style="flex:.6">
+              <label>Answer (auto)</label>
+              <input type="number" id="math-answer" placeholder="–" readonly
+                     style="background:#f8fafc;color:var(--blue);font-weight:700"/>
+            </div>
+            <div class="form-field">
+              <label>&nbsp;</label>
+              <button class="btn btn-blue" onclick="addMathQuestion()">Add Question</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Abacus form -->
+        <div id="add-abacus-form" class="add-form">
+          <div class="form-row">
+            <div class="form-field">
+              <label>Number to show on abacus (1–99)</label>
+              <input type="number" id="abacus-number" min="1" max="99" placeholder="47"
+                     oninput="updateAbacusPreview()" style="width:120px"/>
+            </div>
+            <div class="form-field">
+              <label>&nbsp;</label>
+              <button class="btn btn-blue" onclick="addAbacusQuestion()">Add Diagram Question</button>
+            </div>
+          </div>
+          <div class="abacus-preview-wrap" id="abacus-preview-wrap" style="display:none">
+            <div class="preview-abacus-box" id="abacus-preview-svg"></div>
+            <div class="preview-label">
+              Students will see this abacus and must type the number it shows.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ ACTION BAR (sticky) ══════════════ -->
+<div class="action-bar" id="action-bar">
+  <span class="ab-count" id="ab-count">0 selected</span>
+  <input type="text" id="paper-name-input" placeholder="Paper name (e.g. Week 3 Test)"/>
+  <button class="btn-white" onclick="setAsPaper()">✓ Set as Active Paper</button>
+  <button class="ab-deselect" onclick="deselectAll()">✕ Deselect All</button>
+</div>
+
+<!-- ══════════════ SUBMISSION DETAIL MODAL ══════════════ -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2 id="modal-title"></h2>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+// ══ State ══════════════════════════════════════════════════════════════════════
+let allResults   = [];
+let allQuestions = [];
+let selected     = new Set();   // selected question IDs (numbers)
+let filterType   = 'all';
+let sortKey      = 'submitted_at';
+let sortAsc      = false;
+
+// ══ Tab switching ══════════════════════════════════════════════════════════════
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'questions') loadQuestionsTab();
+  });
+});
+
+// ══ SVG Abacus renderer (mirrors app.js) ══════════════════════════════════════
+function abacusSVG(tensRod, unitsRod, displayW=170, displayH=270) {
+  // Internal coordinate space is always 170×270; displayW/H only scale the element.
+  const VW=170, VH=270;
+  const BEAM_Y=105, BEAM_H=10, BEAD_R=13, BEAD_GAP=28;
+  const ROD_X=[60,110];
+  const upperActiveY = BEAM_Y - BEAD_R - 4, upperInactiveY = 22;
+  const lowerStart   = BEAM_Y + BEAM_H + BEAD_R + 2;
+  const lowerBottom  = VH - 20 - BEAD_R;
+
+  function beadY(rod, i) {
+    if (i < rod.lower) return lowerStart + i * BEAD_GAP;
+    const ti = i - rod.lower, n = 4 - rod.lower;
+    return lowerBottom - (n - 1 - ti) * BEAD_GAP;
+  }
+
+  const AC='#16a34a', IC='#f97316', ST='#1e293b';
+  let s = `<svg width="${displayW}" height="${displayH}" viewBox="0 0 ${VW} ${VH}" xmlns="http://www.w3.org/2000/svg">`;
+  s += `<rect x="0" y="0" width="${VW}" height="${VH}" rx="10" fill="#7c3f00"/>`;
+  s += `<rect x="5" y="5" width="${VW-10}" height="${VH-10}" rx="8" fill="#d4a56a"/>`;
+  s += `<rect x="0" y="${BEAM_Y}" width="${VW}" height="${BEAM_H}" fill="#5d2e0c"/>`;
+
+  [tensRod, unitsRod].forEach((rod, ri) => {
+    const rx = ROD_X[ri];
+    s += `<line x1="${rx}" y1="8" x2="${rx}" y2="${VH-8}" stroke="#7c3f00" stroke-width="4" stroke-linecap="round"/>`;
+    const uy = rod.upper===1 ? upperActiveY : upperInactiveY;
+    s += bead(rx, uy, BEAD_R, rod.upper===1 ? AC : IC, ST);
+    for (let i=0;i<4;i++) s += bead(rx, beadY(rod,i), BEAD_R, i<rod.lower ? AC : IC, ST);
+    s += `<text x="${rx}" y="${VH-4}" text-anchor="middle" font-size="10" font-weight="bold" fill="#5d2e0c" font-family="sans-serif">${ri===0?'Tens':'Units'}</text>`;
+  });
+  s += '</svg>';
+  return s;
+
+  function bead(cx,cy,r,fill,stroke) {
+    return `<ellipse cx="${cx}" cy="${cy}" rx="${r}" ry="${r*.72}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/>` +
+           `<ellipse cx="${cx-r*.28}" cy="${cy-r*.18}" rx="${r*.28}" ry="${r*.16}" fill="rgba(255,255,255,.38)" stroke="none"/>`;
+  }
+}
+
+function numberToRods(n) {
+  const t=Math.floor(n/10), u=n%10;
+  return {
+    tens:  { upper: t>=5?1:0, lower: t>=5?t-5:t },
+    units: { upper: u>=5?1:0, lower: u>=5?u-5:u },
+  };
+}
+
+// ══ Results tab ════════════════════════════════════════════════════════════════
+async function loadResults() {
+  document.getElementById('loading').style.display='block';
+  document.getElementById('results-table').style.display='none';
+  document.getElementById('empty').style.display='none';
+  try {
+    allResults = await fetch('/api/results').then(r=>r.json());
+    document.getElementById('last-refresh').textContent='Refreshed '+new Date().toLocaleTimeString();
+    renderStats();
+    renderTable(allResults);
+  } catch(e) {
+    document.getElementById('loading').textContent='Error: '+e.message;
+  }
+}
+
+function renderStats() {
+  const n = allResults.length;
+  document.getElementById('stat-total').textContent = n;
+  if (!n) return;
+  document.getElementById('stat-avg').textContent =
+    (allResults.reduce((s,r)=>s+parseFloat(r.percentage),0)/n).toFixed(1)+'%';
+  document.getElementById('stat-perfect').textContent =
+    allResults.filter(r=>r.score===r.total).length;
+  document.getElementById('stat-time').textContent =
+    fmtTime(Math.round(allResults.reduce((s,r)=>s+(r.time_taken||0),0)/n));
+}
+
+function renderTable(rows) {
+  document.getElementById('loading').style.display='none';
+  if (!rows.length) { document.getElementById('empty').style.display='block'; return; }
+  document.getElementById('results-table').style.display='table';
+
+  const q = document.getElementById('results-search').value.toLowerCase();
+  const filtered = q ? rows.filter(r=>(r.name||'').toLowerCase().includes(q)||(r.email||'').toLowerCase().includes(q)) : rows;
+  const sorted = [...filtered].sort((a,b)=>{
+    let va=a[sortKey], vb=b[sortKey];
+    if (typeof va==='string') { va=va.toLowerCase(); vb=vb.toLowerCase(); }
+    return va<vb ? (sortAsc?-1:1) : va>vb ? (sortAsc?1:-1) : 0;
+  });
+  document.getElementById('table-body').innerHTML = sorted.map(r=>{
+    const pct=parseFloat(r.percentage);
+    return `<tr>
+      <td>${r.id}</td>
+      <td>${esc(r.name||'Anonymous')}</td>
+      <td>${esc(r.email)}</td>
+      <td>${r.score} / ${r.total}</td>
+      <td><span class="badge ${pct>=80?'badge-green':pct>=50?'badge-amber':'badge-red'}">${pct.toFixed(1)}%</span></td>
+      <td>${fmtTime(r.time_taken)}</td>
+      <td>${new Date(r.submitted_at).toLocaleString()}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="showDetail(${r.id})">View</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function sortBy(key) {
+  sortAsc = sortKey===key ? !sortAsc : false;
+  sortKey = key;
+  renderTable(allResults);
+}
+document.getElementById('results-search').addEventListener('input', ()=>renderTable(allResults));
+
+async function showDetail(id) {
+  document.getElementById('modal-title').textContent = `Submission #${id}`;
+  document.getElementById('modal-body').innerHTML = '<p style="color:var(--muted)">Loading…</p>';
+  document.getElementById('modal-overlay').classList.add('open');
+  try {
+    const data = await fetch(`/api/results/${id}`).then(r=>r.json());
+    const answers = typeof data.answers==='string' ? JSON.parse(data.answers) : data.answers;
+    let html = `<div style="background:#f8fafc;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:.83rem;color:var(--muted)">
+      <strong style="color:var(--text)">${esc(data.name||'Anonymous')}</strong> · ${esc(data.email)}
+      · Score: <strong style="color:var(--blue)">${data.score}/${data.total}</strong>
+      · ${parseFloat(data.percentage).toFixed(1)}%
+      · ${fmtTime(data.time_taken)}
+      · ${new Date(data.submitted_at).toLocaleString()}
+    </div>`;
+
+    if (Array.isArray(answers) && answers.length) {
+      html += `<div class="answer-grid">
+        <div class="ag-head"></div>
+        <div class="ag-head">Type</div>
+        <div class="ag-head">Q#</div>
+        <div class="ag-head">Question</div>
+        <div class="ag-head">Student</div>
+        <div class="ag-head">Correct</div>`;
+
+      answers.forEach((a,i) => {
+        const ok = a.correct;
+        const rowCls = ok ? 'ag-row-ok' : 'ag-row-fail';
+        const typeBadge = a.type==='math'
+          ? `<span class="ag-type-math">Math</span>`
+          : `<span class="ag-type-abacus">Abacus</span>`;
+        let qContent = '';
+        if (a.type==='math') {
+          qContent = `<code style="font-size:.9rem;font-weight:700">${esc(a.problem)} = ?</code>`;
+        } else {
+          const svg = abacusSVG(a.tens, a.units, 80, 127);
+          qContent = `<div style="display:inline-block;background:#fdf6ec;border-radius:6px;padding:4px">${svg}</div>
+                      <span style="font-size:.8rem;color:var(--muted);margin-left:6px">Shows ${a.correctAnswer}</span>`;
+        }
+        html += `<div class="${rowCls}" style="display:contents">
+          <div class="ag-cell"><span class="ag-mark ${ok?'ok':'fail'}">${ok?'✓':'✗'}</span></div>
+          <div class="ag-cell">${typeBadge}</div>
+          <div class="ag-cell" style="font-weight:700;color:var(--muted)">Q${i+1}</div>
+          <div class="ag-cell">${qContent}</div>
+          <div class="ag-cell"><span class="${ok?'ag-correct':'ag-user wrong'}">${a.userAnswer||'—'}</span></div>
+          <div class="ag-cell ag-correct">${a.correctAnswer}</div>
+        </div>`;
+      });
+      html += '</div>';
+    }
+    document.getElementById('modal-body').innerHTML = html;
+  } catch(e) {
+    document.getElementById('modal-body').innerHTML = `<p style="color:red">Error: ${e.message}</p>`;
+  }
+}
+
+function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
+document.getElementById('modal-overlay').addEventListener('click', e=>{ if(e.target===e.currentTarget) closeModal(); });
+
+function exportCSV() {
+  if (!allResults.length) return alert('No data.');
+  const cols=['id','name','email','score','total','percentage','time_taken','submitted_at'];
+  const rows=[cols.join(','), ...allResults.map(r=>cols.map(c=>`"${String(r[c]??'').replace(/"/g,'""')}"`).join(','))];
+  const a=Object.assign(document.createElement('a'),{
+    href: URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'})),
+    download: `abacus-results-${new Date().toISOString().slice(0,10)}.csv`
+  });
+  a.click();
+}
+
+// ══ Questions tab ══════════════════════════════════════════════════════════════
+async function loadQuestionsTab() {
+  await Promise.all([loadPaperStatus(), loadQuestions()]);
+}
+
+async function loadPaperStatus() {
+  try {
+    const paper = await fetch('/api/admin/question-paper').then(r=>r.json());
+    renderPaperBanner(paper);
+  } catch(e) { console.error(e); }
+}
+
+function renderPaperBanner(paper) {
+  const el = document.getElementById('paper-banner');
+  if (!paper || !paper.question_ids?.length) {
+    el.innerHTML = `
+      <div class="paper-banner random">
+        <span class="pb-icon">🎲</span>
+        <div class="pb-text">
+          <div class="pb-title">Random Mode</div>
+          <div class="pb-sub">Each test picks 5 random abacus + 15 random math questions from the pool.</div>
+        </div>
+      </div>`;
+  } else {
+    const dt = new Date(paper.set_at).toLocaleString();
+    el.innerHTML = `
+      <div class="paper-banner active">
+        <span class="pb-icon">📋</span>
+        <div class="pb-text">
+          <div class="pb-title">Active Paper: "${esc(paper.name)}"</div>
+          <div class="pb-sub">${paper.question_ids.length} questions fixed for every test session · Set ${dt}</div>
+        </div>
+        <button class="btn btn-red btn-sm" onclick="clearPaper()">✕ Clear Paper (use random)</button>
+      </div>`;
+  }
+}
+
+async function loadQuestions() {
+  try {
+    allQuestions = await fetch('/api/admin/questions').then(r=>r.json());
+    renderQuestionList();
+  } catch(e) {
+    document.getElementById('question-list').innerHTML = `<p style="color:red">Error loading: ${e.message}</p>`;
+  }
+}
+
+function renderQuestionList() {
+  const paper = document.querySelector('.paper-banner.active');
+  let activeIds = new Set();
+  // Re-fetch paper IDs from the banner data or re-check
+  fetch('/api/admin/question-paper').then(r=>r.json()).then(p=>{
+    activeIds = new Set(p?.question_ids || []);
+    _doRender(activeIds);
+  }).catch(()=>_doRender(activeIds));
+}
+
+function _doRender(activeIds) {
+  const filtered = filterType==='all' ? allQuestions
+    : allQuestions.filter(q=>q.type===filterType);
+
+  const mathCount   = allQuestions.filter(q=>q.type==='math').length;
+  const abacusCount = allQuestions.filter(q=>q.type==='abacus').length;
+  document.getElementById('q-count-label').textContent =
+    `${allQuestions.length} total · ${abacusCount} abacus · ${mathCount} math`;
+
+  if (!filtered.length) {
+    document.getElementById('question-list').innerHTML =
+      `<div style="text-align:center;padding:32px;color:var(--muted)">No questions found.</div>`;
+    return;
+  }
+
+  document.getElementById('question-list').innerHTML = filtered.map(q => {
+    const isSelected = selected.has(q.id);
+    const inPaper    = activeIds.has(q.id);
+    const typeBadge  = q.type==='math'
+      ? `<span class="q-badge-math">Math</span>`
+      : `<span class="q-badge-abacus">Abacus</span>`;
+    let content = '';
+    if (q.type==='math') {
+      content = `<span class="q-math-text">${esc(q.problem)} = ?</span>`;
+    } else {
+      const svg = abacusSVG(q.tens, q.units, 64, 102);
+      content = `<div class="q-abacus-mini">${svg}</div>`;
+    }
+    const inPaperMark = inPaper ? `<span style="color:var(--green);font-size:.75rem;font-weight:700">★ In Paper</span>` : '';
+    return `<div class="q-row${isSelected?' selected':''}" onclick="toggleSelect(${q.id}, event)" data-id="${q.id}">
+      <input type="checkbox" ${isSelected?'checked':''} onclick="toggleSelect(${q.id}, event)"/>
+      <span class="q-id">#${q.id}</span>
+      <span>${typeBadge}</span>
+      <span class="q-content">${content} ${inPaperMark}</span>
+      <span class="q-answer">= ${q.answer}</span>
+      <button class="btn btn-red btn-sm" onclick="deleteQuestion(${q.id}, event)">Delete</button>
+    </div>`;
+  }).join('');
+}
+
+function toggleSelect(id, e) {
+  e?.stopPropagation && e.stopPropagation();
+  if (selected.has(id)) selected.delete(id); else selected.add(id);
+  updateActionBar();
+  // Re-render just classes without full rebuild
+  document.querySelectorAll('.q-row').forEach(row => {
+    const rid = parseInt(row.dataset.id);
+    row.classList.toggle('selected', selected.has(rid));
+    const cb = row.querySelector('input[type=checkbox]');
+    if (cb) cb.checked = selected.has(rid);
+  });
+}
+
+function selectAll() {
+  const filtered = filterType==='all' ? allQuestions : allQuestions.filter(q=>q.type===filterType);
+  filtered.forEach(q=>selected.add(q.id));
+  updateActionBar();
+  document.querySelectorAll('.q-row').forEach(row=>{
+    const rid=parseInt(row.dataset.id);
+    row.classList.toggle('selected', selected.has(rid));
+    const cb=row.querySelector('input[type=checkbox]');
+    if (cb) cb.checked=selected.has(rid);
+  });
+}
+
+function deselectAll() {
+  selected.clear();
+  updateActionBar();
+  document.querySelectorAll('.q-row').forEach(row=>{
+    row.classList.remove('selected');
+    const cb=row.querySelector('input[type=checkbox]');
+    if (cb) cb.checked=false;
+  });
+}
+
+function updateActionBar() {
+  const bar = document.getElementById('action-bar');
+  document.getElementById('ab-count').textContent = `${selected.size} question${selected.size!==1?'s':''} selected`;
+  bar.classList.toggle('visible', selected.size > 0);
+}
+
+// Filter buttons
+document.querySelectorAll('.filter-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    filterType = btn.dataset.ftype;
+    renderQuestionList();
+  });
+});
+
+// Add-type tabs
+document.querySelectorAll('.add-type-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.add-type-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('add-math-form').classList.remove('visible');
+    document.getElementById('add-abacus-form').classList.remove('visible');
+    document.getElementById(`add-${btn.dataset.addType}-form`).classList.add('visible');
+  });
+});
+
+// ── Paper management ──────────────────────────────────────────────────────────
+async function setAsPaper() {
+  if (!selected.size) return;
+  const name = document.getElementById('paper-name-input').value.trim() || 'Custom Paper';
+  try {
+    const res = await fetch('/api/admin/question-paper', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ name, questionIds: [...selected] })
+    }).then(r=>r.json());
+    if (!res.success) throw new Error(res.error);
+    await loadPaperStatus();
+    renderQuestionList();
+    toast(`Paper "${name}" set with ${selected.size} questions.`);
+  } catch(e) { alert('Error: '+e.message); }
+}
+
+async function clearPaper() {
+  if (!confirm('Clear the active paper? Tests will go back to random selection.')) return;
+  try {
+    await fetch('/api/admin/question-paper', { method:'DELETE' });
+    await loadPaperStatus();
+    renderQuestionList();
+    toast('Paper cleared – random mode active.');
+  } catch(e) { alert('Error: '+e.message); }
+}
+
+// ── Add questions ─────────────────────────────────────────────────────────────
+function autoCalcAnswer() {
+  const prob = document.getElementById('math-problem').value;
+  try {
+    const safe = prob.replace(/[^0-9+\-\s]/g,'');
+    const ans  = Function('"use strict"; return ('+safe+')')();
+    document.getElementById('math-answer').value = Number.isFinite(ans) ? ans : '';
+  } catch { document.getElementById('math-answer').value = ''; }
+}
+
+async function addMathQuestion() {
+  const problem = document.getElementById('math-problem').value.trim();
+  if (!problem) return alert('Enter a problem expression.');
+  try {
+    const q = await fetch('/api/admin/questions', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ type:'math', problem })
+    }).then(r=>r.json());
+    if (q.error) throw new Error(q.error);
+    document.getElementById('math-problem').value = '';
+    document.getElementById('math-answer').value  = '';
+    await loadQuestions();
+    toast(`Math question added (ID #${q.id})`);
+  } catch(e) { alert('Error: '+e.message); }
+}
+
+function updateAbacusPreview() {
+  const n   = parseInt(document.getElementById('abacus-number').value, 10);
+  const wrap = document.getElementById('abacus-preview-wrap');
+  if (isNaN(n) || n<1 || n>99) { wrap.style.display='none'; return; }
+  const rods = numberToRods(n);
+  document.getElementById('abacus-preview-svg').innerHTML = abacusSVG(rods.tens, rods.units, 160, 254);
+  wrap.style.display = 'flex';
+}
+
+async function addAbacusQuestion() {
+  const n = parseInt(document.getElementById('abacus-number').value, 10);
+  if (isNaN(n)||n<1||n>99) return alert('Enter a number between 1 and 99.');
+  try {
+    const q = await fetch('/api/admin/questions', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ type:'abacus', number: n })
+    }).then(r=>r.json());
+    if (q.error) throw new Error(q.error);
+    document.getElementById('abacus-number').value = '';
+    document.getElementById('abacus-preview-wrap').style.display = 'none';
+    await loadQuestions();
+    toast(`Abacus question added — shows ${n} (ID #${q.id})`);
+  } catch(e) { alert('Error: '+e.message); }
+}
+
+async function deleteQuestion(id, e) {
+  e?.stopPropagation();
+  if (!confirm(`Delete question #${id}? This cannot be undone.`)) return;
+  try {
+    await fetch(`/api/admin/questions/${id}`, { method:'DELETE' });
+    selected.delete(id);
+    updateActionBar();
+    await loadQuestions();
+    await loadPaperStatus();
+    toast(`Question #${id} deleted.`);
+  } catch(e) { alert('Error: '+e.message); }
+}
+
+// ── Toast notification ────────────────────────────────────────────────────────
+function toast(msg) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  Object.assign(t.style, {
+    position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)',
+    background:'#1e293b', color:'#fff', padding:'10px 22px', borderRadius:'8px',
+    fontSize:'.88rem', fontWeight:'600', zIndex:'200',
+    opacity:'1', transition:'opacity .4s',
+  });
+  document.body.appendChild(t);
+  setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(), 400); }, 2500);
+}
+
+// ── Shared helpers ─────────────────────────────────────────────────────────────
+function fmtTime(s) {
+  if (!s) return '–';
+  const m=Math.floor(s/60); return m>0 ? `${m}m ${s%60}s` : `${s}s`;
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadResults();
+</script>
+</body>
+</html>
