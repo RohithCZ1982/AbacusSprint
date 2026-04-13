@@ -33,15 +33,15 @@ function startTimer() {
 
 // ── SVG Abacus renderer ───────────────────────────────────────────────────────
 /**
- * Draws a 2-rod Japanese soroban (tens + units) as an SVG string.
+ * Draws a 4-rod Japanese soroban (thousands + hundreds + tens + units) as an SVG string.
  * Each rod config: { upper: 0|1, lower: 0-4 }
  * Rod value = upper*5 + lower
  */
-function abacusSVG(tensRod, unitsRod) {
-  const W  = 170, H = 270;
+function abacusSVG(thousandsRod, hundredsRod, tensRod, unitsRod) {
+  const W  = 220, H = 270;
   const BEAM_Y = 105, BEAM_H = 10;
   const BEAD_R = 13, BEAD_GAP = 28;
-  const ROD_X  = [60, 110];  // tens, units
+  const ROD_X  = [27, 77, 127, 177];  // thousands, hundreds, tens, units
 
   // Vertical positions
   const upperActiveY   = BEAM_Y - BEAD_R - 4;   // heaven bead touching beam
@@ -50,11 +50,9 @@ function abacusSVG(tensRod, unitsRod) {
   const lowerBottom    = H - 20 - BEAD_R;         // bottom of lower section
 
   function beadY(rodCfg, i) {
-    // i = 0..3; first rod.lower beads are "active" (near beam)
     if (i < rodCfg.lower) {
       return lowerStart + i * BEAD_GAP;
     }
-    // remaining are inactive (near bottom)
     const totalInactive = 4 - rodCfg.lower;
     const inactiveIdx   = i - rodCfg.lower;
     return lowerBottom - (totalInactive - 1 - inactiveIdx) * BEAD_GAP;
@@ -67,6 +65,7 @@ function abacusSVG(tensRod, unitsRod) {
   const WOOD_COLOR     = '#d4a56a';
   const FRAME_COLOR    = '#7c3f00';
   const BEAM_COLOR     = '#5d2e0c';
+  const ZERO = { upper: 0, lower: 0 };
 
   let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
 
@@ -76,8 +75,8 @@ function abacusSVG(tensRod, unitsRod) {
   // Beam
   s += `<rect x="0" y="${BEAM_Y}" width="${W}" height="${BEAM_H}" fill="${BEAM_COLOR}"/>`;
 
-  const rods = [tensRod, unitsRod];
-  const labels = ['Tens', 'Units'];
+  const rods   = [thousandsRod||ZERO, hundredsRod||ZERO, tensRod||ZERO, unitsRod||ZERO];
+  const labels = ['Th', 'H', 'T', 'U'];
 
   rods.forEach((rod, ri) => {
     const rx = ROD_X[ri];
@@ -122,7 +121,7 @@ function renderQuestion(idx) {
   html += `<div class="q-label">Question ${idx + 1} of ${questions.length}</div>`;
 
   if (q.type === 'abacus') {
-    const svg = abacusSVG(q.tens, q.units);
+    const svg = abacusSVG(q.thousands, q.hundreds, q.tens, q.units);
     html += `
       <div class="abacus-wrap">
         <p class="abacus-question-text">What number does this abacus show?</p>
@@ -352,7 +351,7 @@ function showResults(data) {
         qBody = `<div class="rv-problem">${item.problem} = ?</div>`;
       } else {
         // Abacus: show the SVG diagram + the number it represents
-        const svg = abacusSVG(item.tens, item.units);
+        const svg = abacusSVG(item.thousands, item.hundreds, item.tens, item.units);
         qBody = `
           <div class="rv-abacus-wrap">
             <div class="abacus-svg-wrap rv-abacus-svg">${svg}</div>

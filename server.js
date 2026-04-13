@@ -93,7 +93,7 @@ function shuffle(arr) {
 function safeQ(row) {
   const q = { id: row.id, type: row.type };
   if (row.type === 'math')   q.problem = row.problem;
-  if (row.type === 'abacus') { q.tens = row.tens; q.units = row.units; }
+  if (row.type === 'abacus') { q.thousands = row.thousands; q.hundreds = row.hundreds; q.tens = row.tens; q.units = row.units; }
   return q;
 }
 
@@ -103,7 +103,7 @@ function buildDetail(row, userAnswer) {
   const correct = parseInt(raw, 10) === row.answer;
   const rec     = { questionId: row.id, type: row.type, userAnswer: raw, correctAnswer: row.answer, correct };
   if (row.type === 'math')   rec.problem = row.problem;
-  if (row.type === 'abacus') { rec.tens = row.tens; rec.units = row.units; }
+  if (row.type === 'abacus') { rec.thousands = row.thousands; rec.hundreds = row.hundreds; rec.tens = row.tens; rec.units = row.units; }
   return rec;
 }
 
@@ -116,12 +116,16 @@ async function initDB() {
         id         SERIAL       PRIMARY KEY,
         type       VARCHAR(10)  NOT NULL,
         problem    TEXT,
+        thousands  JSONB,
+        hundreds   JSONB,
         tens       JSONB,
         units      JSONB,
         answer     INTEGER      NOT NULL,
         is_seeded  BOOLEAN      DEFAULT FALSE,
         created_at TIMESTAMPTZ  DEFAULT NOW()
       );
+      ALTER TABLE questions ADD COLUMN IF NOT EXISTS thousands JSONB;
+      ALTER TABLE questions ADD COLUMN IF NOT EXISTS hundreds  JSONB;
 
       CREATE TABLE IF NOT EXISTS question_paper (
         singleton    INTEGER      PRIMARY KEY DEFAULT 1,
@@ -152,9 +156,11 @@ async function initDB() {
       await client.query(`DELETE FROM questions WHERE is_seeded = TRUE`);
       for (const q of [...ABACUS_SEED, ...MATH_SEED]) {
         await client.query(
-          `INSERT INTO questions (type, problem, tens, units, answer, is_seeded)
-           VALUES ($1, $2, $3, $4, $5, TRUE)`,
+          `INSERT INTO questions (type, problem, thousands, hundreds, tens, units, answer, is_seeded)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)`,
           [q.type, q.problem ?? null,
+           q.thousands ? JSON.stringify(q.thousands) : null,
+           q.hundreds  ? JSON.stringify(q.hundreds)  : null,
            q.tens  ? JSON.stringify(q.tens)  : null,
            q.units ? JSON.stringify(q.units) : null,
            q.answer]
@@ -287,7 +293,7 @@ app.post('/api/admin/questions', async (req, res) => {
     return res.status(400).json({ error: 'type must be math or abacus' });
   }
   try {
-    let finalProblem = null, tens = null, units = null, answer;
+    let finalProblem = null, thousands = null, hundreds = null, tens = null, units = null, answer;
 
     if (type === 'math') {
       if (!problem) return res.status(400).json({ error: 'problem is required' });
@@ -298,21 +304,25 @@ app.post('/api/admin/questions', async (req, res) => {
       if (!Number.isFinite(answer)) return res.status(400).json({ error: 'Cannot evaluate expression' });
     } else {
       const n = parseInt(number, 10);
-      if (isNaN(n) || n < 1 || n > 99) {
-        return res.status(400).json({ error: 'number must be 1–99 for abacus' });
+      if (isNaN(n) || n < 1 || n > 9999) {
+        return res.status(400).json({ error: 'number must be 1–9999 for abacus' });
       }
-      const t = Math.floor(n / 10), u = n % 10;
-      tens   = { upper: t >= 5 ? 1 : 0, lower: t >= 5 ? t - 5 : t };
-      units  = { upper: u >= 5 ? 1 : 0, lower: u >= 5 ? u - 5 : u };
+      const th = Math.floor(n / 1000), h = Math.floor((n % 1000) / 100), t = Math.floor((n % 100) / 10), u = n % 10;
+      thousands = { upper: th >= 5 ? 1 : 0, lower: th >= 5 ? th - 5 : th };
+      hundreds  = { upper: h  >= 5 ? 1 : 0, lower: h  >= 5 ? h  - 5 : h  };
+      tens      = { upper: t  >= 5 ? 1 : 0, lower: t  >= 5 ? t  - 5 : t  };
+      units     = { upper: u  >= 5 ? 1 : 0, lower: u  >= 5 ? u  - 5 : u  };
       answer = n;
     }
 
     const { rows } = await pool.query(
-      `INSERT INTO questions (type, problem, tens, units, answer, is_seeded)
-       VALUES ($1, $2, $3, $4, $5, FALSE) RETURNING *`,
+      `INSERT INTO questions (type, problem, thousands, hundreds, tens, units, answer, is_seeded)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE) RETURNING *`,
       [type, finalProblem,
-       tens  ? JSON.stringify(tens)  : null,
-       units ? JSON.stringify(units) : null,
+       thousands ? JSON.stringify(thousands) : null,
+       hundreds  ? JSON.stringify(hundreds)  : null,
+       tens      ? JSON.stringify(tens)      : null,
+       units     ? JSON.stringify(units)     : null,
        answer]
     );
     res.json(rows[0]);

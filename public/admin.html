@@ -347,8 +347,8 @@
         <div id="add-abacus-form" class="add-form">
           <div class="form-row">
             <div class="form-field">
-              <label>Number to show on abacus (1–99)</label>
-              <input type="number" id="abacus-number" min="1" max="99" placeholder="47"
+              <label>Number to show on abacus (1–9999)</label>
+              <input type="number" id="abacus-number" min="1" max="9999" placeholder="47"
                      oninput="updateAbacusPreview()" style="width:120px"/>
             </div>
             <div class="form-field">
@@ -408,14 +408,15 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 
 // ══ SVG Abacus renderer (mirrors app.js) ══════════════════════════════════════
-function abacusSVG(tensRod, unitsRod, displayW=170, displayH=270) {
-  // Internal coordinate space is always 170×270; displayW/H only scale the element.
-  const VW=170, VH=270;
+function abacusSVG(thousandsRod, hundredsRod, tensRod, unitsRod, displayW=220, displayH=270) {
+  // Internal coordinate space is always 220×270; displayW/H only scale the element.
+  const VW=220, VH=270;
   const BEAM_Y=105, BEAM_H=10, BEAD_R=13, BEAD_GAP=28;
-  const ROD_X=[60,110];
+  const ROD_X=[27,77,127,177];
   const upperActiveY = BEAM_Y - BEAD_R - 4, upperInactiveY = 22;
   const lowerStart   = BEAM_Y + BEAM_H + BEAD_R + 2;
   const lowerBottom  = VH - 20 - BEAD_R;
+  const LABELS       = ['Th','H','T','U'];
 
   function beadY(rod, i) {
     if (i < rod.lower) return lowerStart + i * BEAD_GAP;
@@ -429,13 +430,14 @@ function abacusSVG(tensRod, unitsRod, displayW=170, displayH=270) {
   s += `<rect x="5" y="5" width="${VW-10}" height="${VH-10}" rx="8" fill="#d4a56a"/>`;
   s += `<rect x="0" y="${BEAM_Y}" width="${VW}" height="${BEAM_H}" fill="#5d2e0c"/>`;
 
-  [tensRod, unitsRod].forEach((rod, ri) => {
+  const ZERO = {upper:0, lower:0};
+  [thousandsRod||ZERO, hundredsRod||ZERO, tensRod||ZERO, unitsRod||ZERO].forEach((rod, ri) => {
     const rx = ROD_X[ri];
     s += `<line x1="${rx}" y1="8" x2="${rx}" y2="${VH-8}" stroke="#7c3f00" stroke-width="4" stroke-linecap="round"/>`;
     const uy = rod.upper===1 ? upperActiveY : upperInactiveY;
     s += bead(rx, uy, BEAD_R, rod.upper===1 ? AC : IC, ST);
     for (let i=0;i<4;i++) s += bead(rx, beadY(rod,i), BEAD_R, i<rod.lower ? AC : IC, ST);
-    s += `<text x="${rx}" y="${VH-4}" text-anchor="middle" font-size="10" font-weight="bold" fill="#5d2e0c" font-family="sans-serif">${ri===0?'Tens':'Units'}</text>`;
+    s += `<text x="${rx}" y="${VH-4}" text-anchor="middle" font-size="10" font-weight="bold" fill="#5d2e0c" font-family="sans-serif">${LABELS[ri]}</text>`;
   });
   s += '</svg>';
   return s;
@@ -447,10 +449,12 @@ function abacusSVG(tensRod, unitsRod, displayW=170, displayH=270) {
 }
 
 function numberToRods(n) {
-  const t=Math.floor(n/10), u=n%10;
+  const th=Math.floor(n/1000), h=Math.floor((n%1000)/100), t=Math.floor((n%100)/10), u=n%10;
   return {
-    tens:  { upper: t>=5?1:0, lower: t>=5?t-5:t },
-    units: { upper: u>=5?1:0, lower: u>=5?u-5:u },
+    thousands: { upper: th>=5?1:0, lower: th>=5?th-5:th },
+    hundreds:  { upper: h >=5?1:0, lower: h >=5?h -5:h  },
+    tens:      { upper: t >=5?1:0, lower: t >=5?t -5:t  },
+    units:     { upper: u >=5?1:0, lower: u >=5?u -5:u  },
   };
 }
 
@@ -549,7 +553,7 @@ async function showDetail(id) {
         if (a.type==='math') {
           qContent = `<code style="font-size:.9rem;font-weight:700">${esc(a.problem)} = ?</code>`;
         } else {
-          const svg = abacusSVG(a.tens, a.units, 80, 127);
+          const svg = abacusSVG(a.thousands, a.hundreds, a.tens, a.units, 104, 127);
           qContent = `<div style="display:inline-block;background:#fdf6ec;border-radius:6px;padding:4px">${svg}</div>
                       <span style="font-size:.8rem;color:var(--muted);margin-left:6px">Shows ${a.correctAnswer}</span>`;
         }
@@ -665,7 +669,7 @@ function _doRender(activeIds) {
     if (q.type==='math') {
       content = `<span class="q-math-text">${esc(q.problem)} = ?</span>`;
     } else {
-      const svg = abacusSVG(q.tens, q.units, 64, 102);
+      const svg = abacusSVG(q.thousands, q.hundreds, q.tens, q.units, 83, 102);
       content = `<div class="q-abacus-mini">${svg}</div>`;
     }
     const inPaperMark = inPaper ? `<span style="color:var(--green);font-size:.75rem;font-weight:700">★ In Paper</span>` : '';
@@ -797,15 +801,15 @@ async function addMathQuestion() {
 function updateAbacusPreview() {
   const n   = parseInt(document.getElementById('abacus-number').value, 10);
   const wrap = document.getElementById('abacus-preview-wrap');
-  if (isNaN(n) || n<1 || n>99) { wrap.style.display='none'; return; }
+  if (isNaN(n) || n<1 || n>9999) { wrap.style.display='none'; return; }
   const rods = numberToRods(n);
-  document.getElementById('abacus-preview-svg').innerHTML = abacusSVG(rods.tens, rods.units, 160, 254);
+  document.getElementById('abacus-preview-svg').innerHTML = abacusSVG(rods.thousands, rods.hundreds, rods.tens, rods.units, 207, 254);
   wrap.style.display = 'flex';
 }
 
 async function addAbacusQuestion() {
   const n = parseInt(document.getElementById('abacus-number').value, 10);
-  if (isNaN(n)||n<1||n>99) return alert('Enter a number between 1 and 99.');
+  if (isNaN(n)||n<1||n>9999) return alert('Enter a number between 1 and 9999.');
   try {
     const q = await fetch('/api/admin/questions', {
       method:'POST', headers:{'Content-Type':'application/json'},
