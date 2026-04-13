@@ -163,6 +163,14 @@
       background:rgba(255,255,255,.2); color:#fff; border:none; border-radius:6px;
       padding:6px 12px; font-size:.82rem; cursor:pointer; flex-shrink:0;
     }
+    .ab-time-label {
+      display:flex; align-items:center; gap:5px; font-size:.88rem; font-weight:600;
+      color:rgba(255,255,255,.9); flex-shrink:0;
+    }
+    .ab-time-label input {
+      flex:none; min-width:unset; max-width:unset; width:52px;
+      padding:6px 8px; text-align:center; font-weight:700;
+    }
 
     /* ── Add question section ── */
     .add-section { margin-top:28px; }
@@ -374,6 +382,11 @@
 <div class="action-bar" id="action-bar">
   <span class="ab-count" id="ab-count">0 selected</span>
   <input type="text" id="paper-name-input" placeholder="Paper name (e.g. Week 3 Test)"/>
+  <label class="ab-time-label">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    <input type="number" id="paper-time-input" min="1" max="180" value="15" style="width:52px"/>
+    <span>min</span>
+  </label>
   <button class="btn-white" onclick="setAsPaper()">✓ Set as Active Paper</button>
   <button class="ab-deselect" onclick="deselectAll()">✕ Deselect All</button>
 </div>
@@ -612,13 +625,18 @@ function renderPaperBanner(paper) {
         </div>
       </div>`;
   } else {
-    const dt = new Date(paper.set_at).toLocaleString();
+    const dt      = new Date(paper.set_at).toLocaleString();
+    const limSecs = paper.time_limit_secs ?? 900;
+    const limMin  = Math.round(limSecs / 60);
+    // Pre-fill action bar inputs with current paper values
+    document.getElementById('paper-name-input').value = paper.name || '';
+    document.getElementById('paper-time-input').value = limMin;
     el.innerHTML = `
       <div class="paper-banner active">
         <span class="pb-icon">📋</span>
         <div class="pb-text">
           <div class="pb-title">Active Paper: "${esc(paper.name)}"</div>
-          <div class="pb-sub">${paper.question_ids.length} questions fixed for every test session · Set ${dt}</div>
+          <div class="pb-sub">${paper.question_ids.length} questions · ⏱ ${limMin} min time limit · Set ${dt}</div>
         </div>
         <button class="btn btn-red btn-sm" onclick="clearPaper()">✕ Clear Paper (use random)</button>
       </div>`;
@@ -749,16 +767,18 @@ document.querySelectorAll('.add-type-btn').forEach(btn=>{
 // ── Paper management ──────────────────────────────────────────────────────────
 async function setAsPaper() {
   if (!selected.size) return;
-  const name = document.getElementById('paper-name-input').value.trim() || 'Custom Paper';
+  const name        = document.getElementById('paper-name-input').value.trim() || 'Custom Paper';
+  const limitMins   = parseInt(document.getElementById('paper-time-input').value, 10);
+  const timeLimitSecs = (!isNaN(limitMins) && limitMins > 0) ? limitMins * 60 : 900;
   try {
     const res = await fetch('/api/admin/question-paper', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ name, questionIds: [...selected] })
+      body: JSON.stringify({ name, questionIds: [...selected], timeLimitSecs })
     }).then(r=>r.json());
     if (!res.success) throw new Error(res.error);
     await loadPaperStatus();
     renderQuestionList();
-    toast(`Paper "${name}" set with ${selected.size} questions.`);
+    toast(`Paper "${name}" set with ${selected.size} questions · ${Math.round(timeLimitSecs/60)} min limit.`);
   } catch(e) { alert('Error: '+e.message); }
 }
 

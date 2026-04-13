@@ -128,11 +128,13 @@ async function initDB() {
       ALTER TABLE questions ADD COLUMN IF NOT EXISTS hundreds  JSONB;
 
       CREATE TABLE IF NOT EXISTS question_paper (
-        singleton    INTEGER      PRIMARY KEY DEFAULT 1,
-        name         VARCHAR(255) NOT NULL DEFAULT 'Custom Paper',
-        question_ids INTEGER[]    NOT NULL DEFAULT '{}',
-        set_at       TIMESTAMPTZ  DEFAULT NOW()
+        singleton       INTEGER      PRIMARY KEY DEFAULT 1,
+        name            VARCHAR(255) NOT NULL DEFAULT 'Custom Paper',
+        question_ids    INTEGER[]    NOT NULL DEFAULT '{}',
+        time_limit_secs INTEGER      NOT NULL DEFAULT 900,
+        set_at          TIMESTAMPTZ  DEFAULT NOW()
       );
+      ALTER TABLE question_paper ADD COLUMN IF NOT EXISTS time_limit_secs INTEGER NOT NULL DEFAULT 900;
 
       CREATE TABLE IF NOT EXISTS test_submissions (
         id           SERIAL       PRIMARY KEY,
@@ -187,6 +189,7 @@ app.get('/api/questions', async (_req, res) => {
     );
 
     let questions;
+    let timeLimitSecs = 0;
     if (paper.length > 0 && paper[0].question_ids.length > 0) {
       const { rows } = await pool.query(
         `SELECT * FROM questions WHERE id = ANY($1)`,
@@ -196,6 +199,7 @@ app.get('/api/questions', async (_req, res) => {
       const ab = shuffle(rows.filter(q => q.type === 'abacus'));
       const ma = shuffle(rows.filter(q => q.type === 'math'));
       questions = [...ab, ...ma];
+      timeLimitSecs = paper[0].time_limit_secs ?? 900;
     } else {
       const { rows: ab } = await pool.query(
         `SELECT * FROM questions WHERE type = 'abacus' ORDER BY RANDOM() LIMIT 5`
@@ -206,7 +210,7 @@ app.get('/api/questions', async (_req, res) => {
       questions = [...ab, ...ma];
     }
 
-    res.json(questions.map(safeQ));
+    res.json({ questions: questions.map(safeQ), timeLimitSecs });
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ error: 'Failed to load questions' });
@@ -363,19 +367,21 @@ app.get('/api/admin/question-paper', async (_req, res) => {
 });
 
 app.post('/api/admin/question-paper', async (req, res) => {
-  const { name, questionIds } = req.body;
+  const { name, questionIds, timeLimitSecs } = req.body;
   if (!Array.isArray(questionIds) || questionIds.length === 0) {
     return res.status(400).json({ error: 'questionIds must be a non-empty array' });
   }
+  const limitSecs = Number.isInteger(timeLimitSecs) && timeLimitSecs > 0 ? timeLimitSecs : 900;
   try {
     await pool.query(
-      `INSERT INTO question_paper (singleton, name, question_ids, set_at)
-       VALUES (1, $1, $2, NOW())
+      `INSERT INTO question_paper (singleton, name, question_ids, time_limit_secs, set_at)
+       VALUES (1, $1, $2, $3, NOW())
        ON CONFLICT (singleton) DO UPDATE
          SET name = EXCLUDED.name,
              question_ids = EXCLUDED.question_ids,
+             time_limit_secs = EXCLUDED.time_limit_secs,
              set_at = EXCLUDED.set_at`,
-      [name || 'Custom Paper', questionIds.map(Number)]
+      [name || 'Custom Paper', questionIds.map(Number), limitSecs]
     );
     res.json({ success: true });
   } catch (err) {

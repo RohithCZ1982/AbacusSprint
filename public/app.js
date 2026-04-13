@@ -3,14 +3,15 @@
    ══════════════════════════════════════════════════════════════════════════ */
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let questions   = [];
-let answers     = {};       // { [questionId]: string }
-let currentIdx  = 0;
-let timerSecs   = 0;
-let timerHandle = null;
-let startTime   = null;
-let userEmail   = '';
-let userName    = '';
+let questions     = [];
+let answers       = {};       // { [questionId]: string }
+let currentIdx    = 0;
+let timerSecs     = 0;
+let timerHandle   = null;
+let startTime     = null;
+let userEmail     = '';
+let userName      = '';
+let timeLimitSecs = 0;        // 0 = no limit (count up); >0 = countdown
 
 // ── View helpers ──────────────────────────────────────────────────────────────
 function showView(id) {
@@ -22,13 +23,70 @@ function showView(id) {
 // ── Timer ─────────────────────────────────────────────────────────────────────
 function startTimer() {
   startTime   = Date.now();
-  timerHandle = setInterval(() => {
-    timerSecs++;
+  const el    = document.getElementById('timer');
+
+  if (timeLimitSecs > 0) {
+    // Countdown mode
+    timerSecs = timeLimitSecs;
+    el.classList.remove('warning');
+
+    timerHandle = setInterval(() => {
+      timerSecs--;
+
+      const remaining = Math.max(timerSecs, 0);
+      const m = String(Math.floor(remaining / 60)).padStart(2, '0');
+      const s = String(remaining % 60).padStart(2, '0');
+      el.textContent = `${m}:${s}`;
+
+      if (remaining <= 60) el.classList.add('warning');
+
+      if (remaining <= 0) {
+        clearInterval(timerHandle);
+        timerHandle = null;
+        autoSubmitOnTimeout();
+      }
+    }, 1000);
+
+    // Set display immediately without waiting 1s
     const m = String(Math.floor(timerSecs / 60)).padStart(2, '0');
     const s = String(timerSecs % 60).padStart(2, '0');
-    const el = document.getElementById('timer');
     el.textContent = `${m}:${s}`;
-  }, 1000);
+  } else {
+    // Count-up mode (no limit)
+    timerSecs   = 0;
+    timerHandle = setInterval(() => {
+      timerSecs++;
+      const m = String(Math.floor(timerSecs / 60)).padStart(2, '0');
+      const s = String(timerSecs % 60).padStart(2, '0');
+      el.textContent = `${m}:${s}`;
+    }, 1000);
+  }
+}
+
+function autoSubmitOnTimeout() {
+  showView('view-submitting');
+  const timeTaken = Math.round((Date.now() - startTime) / 1000);
+
+  fetch('/api/submit', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name:        userName,
+      email:       userEmail,
+      answers,
+      questionIds: questions.map(q => q.id),
+      timeTaken,
+    }),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (!data.success) throw new Error(data.error || 'Unknown error');
+      showResults(data);
+    })
+    .catch(err => {
+      alert('Auto-submit failed: ' + err.message);
+      showView('view-register');
+    });
 }
 
 // ── SVG Abacus renderer ───────────────────────────────────────────────────────
@@ -215,6 +273,16 @@ function goTo(idx) {
 
 document.addEventListener('DOMContentLoaded', () => {
 
+  // Initialise test-info from server before form submit
+  fetch('/api/questions').then(r => r.json()).then(data => {
+    const lim  = data.timeLimitSecs ?? 0;
+    const text = lim > 0 ? `${Math.round(lim / 60)} min time limit` : 'No time limit';
+    document.getElementById('test-info-text').textContent =
+      `${data.questions.length} questions · 1 point each · ${text}`;
+  }).catch(() => {
+    document.getElementById('test-info-text').textContent = '20 questions · 1 point each';
+  });
+
   // ── Registration form ──────────────────────────────────────────────────────
   document.getElementById('register-form').addEventListener('submit', async e => {
     e.preventDefault();
@@ -224,13 +292,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     showView('view-submitting');
     try {
-      const res  = await fetch('/api/questions');
-      questions  = await res.json();
+      const data    = await fetch('/api/questions').then(r => r.json());
+      questions     = data.questions;
+      timeLimitSecs = data.timeLimitSecs ?? 0;
     } catch (err) {
       alert('Could not load questions. Please refresh and try again.');
       showView('view-register');
       return;
     }
+
+    // Update test info line with actual question count + time limit
+    const limitText = timeLimitSecs > 0
+      ? `${Math.round(timeLimitSecs / 60)} min time limit`
+      : 'No time limit';
+    document.getElementById('test-info-text').textContent =
+      `${questions.length} questions · 1 point each · ${limitText}`;
 
     answers    = {};
     currentIdx = 0;
@@ -286,6 +362,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── Retake ─────────────────────────────────────────────────────────────────
   document.getElementById('btn-retake').addEventListener('click', () => {
+    timeLimitSecs = 0;
+    document.getElementById('timer').classList.remove('warning');
     document.getElementById('email').value = '';
     document.getElementById('name').value  = '';
     showView('view-register');
@@ -303,15 +381,17 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-exit-confirm').addEventListener('click', () => {
     // Discard everything — no submission, no data stored
     clearInterval(timerHandle);
-    timerHandle = null;
-    questions   = [];
-    answers     = {};
-    currentIdx  = 0;
-    timerSecs   = 0;
-    startTime   = null;
-    userEmail   = '';
-    userName    = '';
+    timerHandle   = null;
+    questions     = [];
+    answers       = {};
+    currentIdx    = 0;
+    timerSecs     = 0;
+    timeLimitSecs = 0;
+    startTime     = null;
+    userEmail     = '';
+    userName      = '';
     document.getElementById('exit-modal-overlay').classList.remove('open');
+    document.getElementById('timer').classList.remove('warning');
     document.getElementById('email').value = '';
     document.getElementById('name').value  = '';
     showView('view-register');
