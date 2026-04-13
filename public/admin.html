@@ -815,8 +815,9 @@ async function togglePaperQuestion(id, inPaper, event) {
     const method = inPaper ? 'DELETE' : 'POST';
     const res = await fetch(`/api/admin/question-paper/questions/${id}`, { method }).then(r=>r.json());
     if (!res.success) throw new Error(res.error);
-    await loadPaperStatus();   // refresh banner count
-    renderQuestionList();      // re-render buttons
+    if (inPaper) { selected.delete(id); updateActionBar(); }
+    await loadPaperStatus();
+    renderQuestionList();
     toast(inPaper ? `Question #${id} removed from paper.` : `Question #${id} added to paper.`);
   } catch(e) { alert('Error: '+e.message); }
 }
