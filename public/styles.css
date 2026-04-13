@@ -260,6 +260,59 @@ button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Abacus loading animation ─────────────────────────────────────────────── */
+@keyframes heaven-drop {
+  0%, 100% { transform: translateY(0);    }
+  45%, 55%  { transform: translateY(66px); }
+}
+@keyframes earth-rise {
+  0%, 100% { transform: translateY(0);     }
+  45%, 55%  { transform: translateY(-40px); }
+}
+.abacus-loader .hb { animation: heaven-drop 1.6s ease-in-out infinite; }
+.abacus-loader .eb { animation: earth-rise  1.6s ease-in-out infinite; }
+.abacus-loader .hb-0, .abacus-loader .eb-0 { animation-delay: 0s;    }
+.abacus-loader .hb-1, .abacus-loader .eb-1 { animation-delay: 0.22s; }
+.abacus-loader .hb-2, .abacus-loader .eb-2 { animation-delay: 0.44s; }
+.abacus-loader .hb-3, .abacus-loader .eb-3 { animation-delay: 0.66s; }
+.loader-title { font-size: 1.1rem; font-weight: 600; color: var(--text); margin-top: 8px; }
+.loader-sub   { font-size: .85rem; color: var(--muted); text-align: center; line-height: 1.5; }
+
+/* ── Exit button ──────────────────────────────────────────────────────────── */
+.btn-exit-test {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 8px; border: 1.5px solid #fca5a5;
+  background: #fff1f1; color: #dc2626; font-size: .85rem; font-weight: 600;
+  cursor: pointer; transition: background .15s, border-color .15s;
+}
+.btn-exit-test:hover { background: #fee2e2; border-color: #ef4444; }
+
+/* ── Exit confirmation modal ──────────────────────────────────────────────── */
+.exit-modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(15,23,42,.55); backdrop-filter: blur(3px);
+  z-index: 999; align-items: center; justify-content: center;
+}
+.exit-modal-overlay.open { display: flex; }
+.exit-modal {
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: 0 8px 40px rgba(0,0,0,.22);
+  padding: 36px 32px 28px; max-width: 380px; width: 90%;
+  text-align: center; animation: modal-in .18s ease;
+}
+@keyframes modal-in { from { transform: scale(.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.exit-modal-icon  { margin-bottom: 12px; }
+.exit-modal-title { font-size: 1.25rem; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+.exit-modal-body  { font-size: .95rem; color: var(--muted); line-height: 1.55; margin-bottom: 24px; }
+.exit-modal-body strong { color: var(--red); }
+.exit-modal-actions { display: flex; gap: 12px; justify-content: center; }
+.btn-exit-confirm {
+  padding: 10px 22px; border-radius: 9px; border: none;
+  background: var(--red); color: #fff; font-size: .95rem; font-weight: 700;
+  cursor: pointer; transition: background .15s;
+}
+.btn-exit-confirm:hover { background: #dc2626; }
+
 /* ── Utilities ────────────────────────────────────────────────────────────── */
 .hidden { display: none !important; }
 

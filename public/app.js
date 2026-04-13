@@ -290,6 +290,32 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('name').value  = '';
     showView('view-register');
   });
+
+  // ── Exit test ──────────────────────────────────────────────────────────────
+  document.getElementById('btn-exit-test').addEventListener('click', () => {
+    document.getElementById('exit-modal-overlay').classList.add('open');
+  });
+
+  document.getElementById('btn-exit-cancel').addEventListener('click', () => {
+    document.getElementById('exit-modal-overlay').classList.remove('open');
+  });
+
+  document.getElementById('btn-exit-confirm').addEventListener('click', () => {
+    // Discard everything — no submission, no data stored
+    clearInterval(timerHandle);
+    timerHandle = null;
+    questions   = [];
+    answers     = {};
+    currentIdx  = 0;
+    timerSecs   = 0;
+    startTime   = null;
+    userEmail   = '';
+    userName    = '';
+    document.getElementById('exit-modal-overlay').classList.remove('open');
+    document.getElementById('email').value = '';
+    document.getElementById('name').value  = '';
+    showView('view-register');
+  });
 });
 
 // ── Show results ──────────────────────────────────────────────────────────────
