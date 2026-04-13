@@ -43,7 +43,7 @@ function startTimer() {
       if (remaining <= 0) {
         clearInterval(timerHandle);
         timerHandle = null;
-        autoSubmitOnTimeout();
+        onTimeExpired();
       }
     }, 1000);
 
@@ -63,30 +63,19 @@ function startTimer() {
   }
 }
 
-function autoSubmitOnTimeout() {
-  showView('view-submitting');
-  const timeTaken = Math.round((Date.now() - startTime) / 1000);
+// Called when countdown hits 0 — lock navigation, force submit button visible
+function onTimeExpired() {
+  // Disable prev/next navigation
+  document.getElementById('btn-prev').disabled = true;
+  document.getElementById('btn-next').disabled = true;
 
-  fetch('/api/submit', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name:        userName,
-      email:       userEmail,
-      answers,
-      questionIds: questions.map(q => q.id),
-      timeTaken,
-    }),
-  })
-    .then(r => r.json())
-    .then(data => {
-      if (!data.success) throw new Error(data.error || 'Unknown error');
-      showResults(data);
-    })
-    .catch(err => {
-      alert('Auto-submit failed: ' + err.message);
-      showView('view-register');
-    });
+  // Always show the submit button regardless of answered count
+  document.getElementById('submit-row').classList.remove('hidden');
+
+  // Flash the timer to make it obvious
+  const el = document.getElementById('timer');
+  el.textContent = '00:00';
+  el.classList.add('warning');
 }
 
 // ── SVG Abacus renderer ───────────────────────────────────────────────────────
@@ -311,6 +300,8 @@ document.addEventListener('DOMContentLoaded', () => {
     answers    = {};
     currentIdx = 0;
     timerSecs  = 0;
+    document.getElementById('btn-next').disabled = false;
+    document.getElementById('btn-prev').disabled = true;
     showView('view-test');
     buildDots();
     renderQuestion(0);
@@ -328,13 +319,18 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Submit ─────────────────────────────────────────────────────────────────
   document.getElementById('btn-submit').addEventListener('click', async () => {
     const unanswered = questions.filter(q => answers[q.id] === undefined).length;
-    if (unanswered > 0) {
+    // Only prompt if time hasn't expired (timer still running)
+    if (timerHandle !== null && unanswered > 0) {
       const go = confirm(`You have ${unanswered} unanswered question(s). Submit anyway?`);
       if (!go) return;
     }
 
     clearInterval(timerHandle);
-    const timeTaken = Math.round((Date.now() - startTime) / 1000);
+    timerHandle = null;
+    // If the timer expired, record the full time limit as time taken
+    const timeTaken = timeLimitSecs > 0 && timerSecs <= 0
+      ? timeLimitSecs
+      : Math.round((Date.now() - startTime) / 1000);
 
     showView('view-submitting');
 
@@ -356,7 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       alert('Submission failed: ' + err.message);
       showView('view-test');
-      startTimer(); // resume timer
+      if (timerSecs > 0) startTimer(); // only resume if time remains
     }
   });
 
