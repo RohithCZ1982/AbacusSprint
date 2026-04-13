@@ -390,6 +390,22 @@ app.post('/api/admin/question-paper', async (req, res) => {
   }
 });
 
+app.patch('/api/admin/question-paper', async (req, res) => {
+  const { name, timeLimitSecs } = req.body;
+  const limitSecs = Number.isInteger(timeLimitSecs) && timeLimitSecs > 0 ? timeLimitSecs : 900;
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE question_paper SET name = $1, time_limit_secs = $2 WHERE singleton = 1`,
+      [name || 'Custom Paper', limitSecs]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'No active paper to update' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: 'Failed to update paper' });
+  }
+});
+
 app.delete('/api/admin/question-paper', async (_req, res) => {
   try {
     await pool.query(`DELETE FROM question_paper WHERE singleton = 1`);

@@ -99,9 +99,27 @@
     .paper-banner.random { background:#eff6ff; border:1.5px solid #bfdbfe; }
     .paper-banner.active { background:#f0fdf4; border:1.5px solid #bbf7d0; }
     .paper-banner .pb-icon { font-size:1.4rem; }
-    .paper-banner .pb-text { flex:1; }
+    .paper-banner .pb-text { flex:1; min-width:0; }
     .paper-banner .pb-title { font-weight:700; font-size:.95rem; }
     .paper-banner .pb-sub   { font-size:.82rem; color:var(--muted); margin-top:2px; }
+    .paper-banner .pb-meta  { margin-bottom:8px; }
+    .pb-edit-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .pb-name-input {
+      flex:1; min-width:160px; padding:6px 10px; border-radius:6px;
+      border:1.5px solid #bbf7d0; font-size:.9rem; font-weight:600;
+      background:#fff; outline:none; transition:border-color .15s;
+    }
+    .pb-name-input:focus { border-color:var(--green); }
+    .pb-time-label {
+      display:flex; align-items:center; gap:4px;
+      font-size:.82rem; font-weight:600; color:var(--muted); flex-shrink:0;
+    }
+    .pb-time-input {
+      width:48px; padding:5px 6px; border-radius:6px;
+      border:1.5px solid #bbf7d0; font-size:.9rem; font-weight:700;
+      text-align:center; background:#fff; outline:none;
+    }
+    .pb-time-input:focus { border-color:var(--green); }
 
     /* ── Question bank filter bar ── */
     .qbank-bar {
@@ -635,10 +653,18 @@ function renderPaperBanner(paper) {
       <div class="paper-banner active">
         <span class="pb-icon">📋</span>
         <div class="pb-text">
-          <div class="pb-title">Active Paper: "${esc(paper.name)}"</div>
-          <div class="pb-sub">${paper.question_ids.length} questions fixed for every test session · Set ${dt}</div>
+          <div class="pb-sub pb-meta">${paper.question_ids.length} questions · Set ${dt}</div>
+          <div class="pb-edit-row">
+            <input class="pb-name-input" id="pb-edit-name" value="${esc(paper.name)}" placeholder="Paper name"/>
+            <label class="pb-time-label">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <input class="pb-time-input" id="pb-edit-time" type="number" min="1" max="180" value="${limMin}"/>
+              <span>min</span>
+            </label>
+            <button class="btn btn-green btn-sm" onclick="updatePaperMeta()">Save</button>
+          </div>
         </div>
-        <button class="btn btn-red btn-sm" onclick="clearPaper()">✕ Clear Paper (use random)</button>
+        <button class="btn btn-red btn-sm" onclick="clearPaper()">✕ Clear Paper</button>
       </div>`;
   }
 }
@@ -789,6 +815,24 @@ async function clearPaper() {
     await loadPaperStatus();
     renderQuestionList();
     toast('Paper cleared – random mode active.');
+  } catch(e) { alert('Error: '+e.message); }
+}
+
+async function updatePaperMeta() {
+  const name        = document.getElementById('pb-edit-name').value.trim() || 'Custom Paper';
+  const limitMins   = parseInt(document.getElementById('pb-edit-time').value, 10);
+  const timeLimitSecs = (!isNaN(limitMins) && limitMins > 0) ? limitMins * 60 : 900;
+  try {
+    const res = await fetch('/api/admin/question-paper', {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ name, timeLimitSecs })
+    }).then(r=>r.json());
+    if (!res.success) throw new Error(res.error);
+    // Sync action bar inputs too
+    document.getElementById('paper-name-input').value = name;
+    document.getElementById('paper-time-input').value = limitMins;
+    await loadPaperStatus();
+    toast(`Paper updated: "${name}" · ${Math.round(timeLimitSecs/60)} min`);
   } catch(e) { alert('Error: '+e.message); }
 }
 
