@@ -448,6 +448,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'questions') loadQuestionsTab();
+    updateActionBar(); // hide bar when leaving questions tab
   });
 });
 
@@ -856,9 +857,14 @@ function deselectAll() {
 }
 
 function updateActionBar() {
-  const bar = document.getElementById('action-bar');
-  document.getElementById('ab-count').textContent = `${selected.size} question${selected.size!==1?'s':''} selected`;
-  bar.classList.toggle('visible', selected.size > 0);
+  const bar    = document.getElementById('action-bar');
+  const onQTab = document.getElementById('tab-questions').classList.contains('active');
+  const show   = selected.size > 0 && onQTab;
+  document.getElementById('ab-count').textContent =
+    `${selected.size} question${selected.size !== 1 ? 's' : ''} selected`;
+  bar.classList.toggle('visible', show);
+  if (!show) bar.style.transform = 'translateY(100%)';
+  else bar.style.transform = '';
 }
 
 // Filter buttons
