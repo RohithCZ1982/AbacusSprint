@@ -636,7 +636,7 @@ function renderPaperBanner(paper) {
         <span class="pb-icon">📋</span>
         <div class="pb-text">
           <div class="pb-title">Active Paper: "${esc(paper.name)}"</div>
-          <div class="pb-sub">${paper.question_ids.length} questions · ⏱ ${limMin} min time limit · Set ${dt}</div>
+          <div class="pb-sub">${paper.question_ids.length} questions fixed for every test session · Set ${dt}</div>
         </div>
         <button class="btn btn-red btn-sm" onclick="clearPaper()">✕ Clear Paper (use random)</button>
       </div>`;
